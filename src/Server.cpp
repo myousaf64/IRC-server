@@ -97,14 +97,6 @@ void Server::handleNewConnection(int sFd, std::vector<pollfd>& fds) {
 	}
 
 	logError("New client connected, FD: {%i}", clientFd);
-	
-	const std::string welcome = ":ircserv 001 client :Welcome to ft_irc\r\n";
-	ssize_t bytesSent = send(clientFd, welcome.c_str(), welcome.length(), 0);
-	if (bytesSent == -1) {
-		throw std::runtime_error("Failed to send welcome message to client");
-	}
-	
-	logError("Welcome message sent to client FD: {%i}", clientFd);
 }
 
 void Server::handleClientMessage(size_t clientIndex, std::vector<pollfd>& fds) {
