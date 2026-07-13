@@ -116,7 +116,7 @@ public:
 	void	getCmd( std::string &cmd, int fd );
 	std::vector<std::string>	splitCmd( std::string &str );
 
-	bool notregistered( int fd );
+	bool isRegistered( int fd );
 	bool nickNameInUse( std::string& nickname );
 	// bool is_validNickname( std::string& nickname );
 	void client_authen( int fd, std::string pass );
