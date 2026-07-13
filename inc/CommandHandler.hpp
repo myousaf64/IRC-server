@@ -24,7 +24,6 @@ void    handlePart();
 
 class Client;
 
-std::vector<std::string> splitReceivedBuffer(const std::string& str);
 std::vector<std::string> splitCmd(std::string& cmd);
 
 /** 

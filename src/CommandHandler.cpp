@@ -32,20 +32,6 @@
 //     return (it != command_map.end()) ? it->second : INVALID;
 // }
 
-// std::vector<std::string> Server::splitReceivedBuffer(const std::string& str) {
-std::vector<std::string> splitReceivedBuffer(const std::string& str) {
-	std::vector<std::string> vec;
-	std::istringstream stm(str);
-	std::string line;
-	while (std::getline(stm, line)) {
-		const size_t pos = line.find_first_of("\r\n");
-		if (pos != std::string::npos)
-			line = line.substr(0, pos);
-		vec.push_back(line);
-	}
-	return vec;
-}
-
 // std::vector<std::string> splitCmd(std::string& cmd)
 std::vector<std::string> Server::splitCmd(std::string& cmd)
 {
