@@ -4,14 +4,12 @@
 
 # ------------------------------- Configuration ------------------------------ #
 
-NAME        := ircserv
-ODIR        := obj
-SANITIZED_FLAG := .sanitized
+NAME     := ircserv
+INC      := inc
+OBJ_ROOT := obj
 
-SRCDIRS := src cmd
-SRCDIR	:= src/
-CMDDIR	:= ${SRCDIR}cmd/
-INC	:=	./inc
+SRCDIR := src/
+CMDDIR := $(SRCDIR)cmd/
 SRC :=	$(SRCDIR)main.cpp \
 		$(SRCDIR)Client.cpp \
 		$(SRCDIR)CommandHandler.cpp \
@@ -27,38 +25,16 @@ SRC :=	$(SRCDIR)main.cpp \
 		$(CMDDIR)quit.cpp \
 		$(CMDDIR)topic.cpp
 
-OBJ := $(patsubst %.cpp, $(ODIR)/%.o, $(SRC))
-
-# ------------------------------ Compilation Flags --------------------------- #
-
-CXXFLAGS	+= -Wall -Wextra -Werror -I$(INC)
-STDFLAG		:= -std=c++98
-SANITIZE	:= -fsanitize=address
-LDFLAGS		:=
-CFLAGS		:= # -stdlib=libstdc++ -fno-rtti
-DEBUGFLAGS	:=
-
-# ------------------------------- Variables ---------------------------------- #
-
-RM     := rm -fr
-OBS    := $(NAME).dSYM .DS_Store .vscode output.log $(NAME).profdata $(NAME).profraw coverage \
-	  coverage.txt coverage.info out
-
-SHIFT  = $(eval O=$(shell echo $$((($(O)%15)+1))))
-
-# # ------------------------------ System Detection ---------------------------- #
+# ------------------------------ System Detection ---------------------------- #
 
 UNAME := $(shell uname -s)
-NUMPROC :=
-CXX := $(firstword $(foreach v,$(shell seq 21 -1 15),$(if $(shell command -v clang++-$(v)),clang++-$(v))))
 
-# CPU core detection
 ifeq ($(UNAME), Darwin)
-	CXX := c++
+	DETECTED_CXX := c++
 	NUMPROC := $(shell sysctl -n hw.ncpu)
-else ifeq ($(UNAME), Linux) # Detect best available compiler
-	CXX := $(shell \
-		for bin in clang++-20 clang++-19 clang++-18 clang++-17 clang++ g++-13 g++-12 g++ ; do \
+else ifeq ($(UNAME), Linux)
+	DETECTED_CXX := $(shell \
+		for bin in clang++-21 clang++-20 clang++-19 clang++-18 clang++-17 clang++ g++-14 g++-13 g++-12 g++ ; do \
 			if command -v $$bin >/dev/null 2>&1; then echo $$bin; break; fi; \
 		done \
 	)
@@ -67,122 +43,139 @@ else
 	$(error Unsupported OS: $(UNAME))
 endif
 
-# Optional: Display detected compiler
-COMPILER_VERSION := $(shell $(CXX) --version | head -n 1)
-# $(info [INFO] Compiler: $(CXX))
-# $(info [INFO] Version : $(COMPILER_VERSION))
-# $(info [INFO] CPU Cores: $(NUMPROC))
-
-# ------------------------------ Build Mode Logic ---------------------------- #
-
-MODE ?= release
-SANITIZED_FLAG ?= .sanitized
-
-PHONY	+= all debug-build release-build
-
-all:
-ifeq ($(MODE), debug)
-	$(MAKE) debug-build
-else
-	$(MAKE) release-build
+# Respect an explicit `make CXX=...` / CI override; autodetect otherwise
+ifeq ($(origin CXX),default)
+	CXX := $(DETECTED_CXX)
 endif
 
-debug-build:
-	@if [ -f "$(SANITIZED_FLAG)" ]; then \
-		$(MAKE) sanitized info buildinfo $(NAME); \
-	else \
-		$(MAKE) info createSANITIZED fclean buildinfo $(NAME); \
-	fi
+COMPILER_VERSION := $(shell $(CXX) --version | head -n 1)
 
-release-build:
-	@if [ -f "$(SANITIZED_FLAG)" ]; then \
-		$(MAKE) removeSANITIZED clean $(NAME) banner; \
-	else \
-		$(MAKE) $(NAME) banner; \
-	fi
+# ------------------------------ Compilation Flags --------------------------- #
 
-# MODE ?=
-# SANITIZED_EXISTS := $(shell [ -f $(SANITIZED_FLAG) ] && echo 1)
+STDFLAG   := -std=c++98
+BASEFLAGS := -Wall -Wextra -Werror $(STDFLAG) -I$(INC)
+DEPFLAGS   = -MMD -MP
+LDFLAGS   :=
 
-# PHONY	:= all
-# ifeq ($(MODE), debug)
-#     DEBUGFLAGS += -fprofile-instr-generate -fcoverage-mapping -g3 $(SANITIZE)
-#     ifeq ($(SANITIZED_EXISTS), 1)
-#         all: info buildinfo $(NAME)
-#     else
-#         all: info createSANITIZED fclean buildinfo $(NAME)
-#     endif
-# else
-#     ifeq ($(SANITIZED_EXISTS), 1)
-#         all: removeSANITIZED clean $(NAME) banner
-#     else
-#         all: $(NAME) banner
-#     endif
-# endif
+RELEASE_FLAGS := -O2
+DEBUG_FLAGS   := -g3 -O0 -DDEBUG
+ASAN_FLAGS    := -g3 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer
+COVER_FLAGS   := -g -O0 -fprofile-instr-generate -fcoverage-mapping
 
-PHONY	+= build
-build:
-	@echo "$(L_BLUE)  [info]:  $(L_GREEN)Starting parallel build using '$(NUMPROC)'' threads...$(RESET)"
-	@$(MAKE) -s -j$(NUMPROC)
+# --------------------------- Objects per variant ----------------------------- #
+
+OBJ_RELEASE := $(SRC:%.cpp=$(OBJ_ROOT)/release/%.o)
+OBJ_DEBUG   := $(SRC:%.cpp=$(OBJ_ROOT)/debug/%.o)
+OBJ_ASAN    := $(SRC:%.cpp=$(OBJ_ROOT)/asan/%.o)
+OBJ_COVER   := $(SRC:%.cpp=$(OBJ_ROOT)/cover/%.o)
+DEPS        := $(OBJ_RELEASE:.o=.d) $(OBJ_DEBUG:.o=.d) $(OBJ_ASAN:.o=.d) $(OBJ_COVER:.o=.d)
+
+BINARIES := $(NAME) $(NAME)-debug $(NAME)-asan $(NAME)-cover
+
+# ------------------------------- Variables ---------------------------------- #
+
+RM  := rm -fr
+OBS := $(NAME).dSYM .DS_Store output.log $(NAME).profdata $(NAME).profraw coverage \
+	   coverage.txt coverage.info out
 
 # --------------------------- Targets & Rules --------------------------------- #
 
-CXXFLAGS += $(DEBUGFLAGS) $(STDFLAG)
-$(NAME): $(OBJ)
-	@$(CXX) $(CXXFLAGS) $(CFLAGS) $(LDFLAGS) $(OBJ) -o $(NAME)
+PHONY += all
+all: $(NAME) banner ## build the release binary (default)
 
-# Automatically create necessary object directories before compilation
-OBJDIRS := $(sort $(dir $(OBJ)))
-PHONY	+= prepare
-prepare:
-	@mkdir -p $(sort $(dir $(OBJ)))
+$(NAME): $(OBJ_RELEASE)
+	@$(CXX) $(BASEFLAGS) $(RELEASE_FLAGS) $(LDFLAGS) $^ -o $@
+	@echo "$(L_BLUE)  [info]:  $(L_GREEN)linked $(L_MAGENTA)$@$(RESET)"
 
-# $(ODIR)%.o: $(SRCDIR)%.cpp | prepare buildinfo
-$(ODIR)/%.o: %.cpp | prepare buildinfo
+$(NAME)-debug: $(OBJ_DEBUG)
+	@$(CXX) $(BASEFLAGS) $(DEBUG_FLAGS) $(LDFLAGS) $^ -o $@
+	@echo "$(L_BLUE)  [info]:  $(L_GREEN)linked $(L_MAGENTA)$@$(RESET)"
+
+$(NAME)-asan: $(OBJ_ASAN)
+	@$(CXX) $(BASEFLAGS) $(ASAN_FLAGS) $(LDFLAGS) $^ -o $@
+	@echo "$(L_BLUE)  [info]:  $(L_GREEN)linked $(L_MAGENTA)$@$(RESET)"
+
+$(NAME)-cover: $(OBJ_COVER)
+	@$(CXX) $(BASEFLAGS) $(COVER_FLAGS) $(LDFLAGS) $^ -o $@
+	@echo "$(L_BLUE)  [info]:  $(L_GREEN)linked $(L_MAGENTA)$@$(RESET)"
+
+PHONY += debug asan
+debug: $(NAME)-debug ## build with -g3 -O0 (binary: ircserv-debug)
+asan: $(NAME)-asan ## build with address+UB sanitizers (binary: ircserv-asan)
+
+$(OBJ_ROOT)/release/%.o: %.cpp
 	@mkdir -p $(dir $@)
 	@printf "$(L_BLUE)  [info]:  $(L_GREEN)%-30s -> $(L_BLUE)%s$(RESET)\n" "$<" "$@"
-	@$(CXX) -c $(CFLAGS) $(CXXFLAGS) $< -o $@
+	@$(CXX) $(BASEFLAGS) $(RELEASE_FLAGS) $(DEPFLAGS) -c $< -o $@
 
-# Define a pattern rule that compiles every .cpp file into a .o file
-PHONY	+= buildinfo
-buildinfo:
-	@echo "$(L_BLUE)  [info]:  $(L_MAGENTA)$(CXX) $(CFLAGS) $(CXXFLAGS)$(RESET)"
+$(OBJ_ROOT)/debug/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	@printf "$(L_BLUE)  [info]:  $(L_GREEN)%-30s -> $(L_BLUE)%s$(RESET)\n" "$<" "$@"
+	@$(CXX) $(BASEFLAGS) $(DEBUG_FLAGS) $(DEPFLAGS) -c $< -o $@
 
-PHONY	+= createSANITIZED
-createSANITIZED:
-	@touch $(SANITIZED_FLAG)
+$(OBJ_ROOT)/asan/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	@printf "$(L_BLUE)  [info]:  $(L_GREEN)%-30s -> $(L_BLUE)%s$(RESET)\n" "$<" "$@"
+	@$(CXX) $(BASEFLAGS) $(ASAN_FLAGS) $(DEPFLAGS) -c $< -o $@
 
-PHONY	+= removeSANITIZED
-removeSANITIZED:
-	@$(RM) $(SANITIZED_FLAG)
+$(OBJ_ROOT)/cover/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	@printf "$(L_BLUE)  [info]:  $(L_GREEN)%-30s -> $(L_BLUE)%s$(RESET)\n" "$<" "$@"
+	@$(CXX) $(BASEFLAGS) $(COVER_FLAGS) $(DEPFLAGS) -c $< -o $@
 
-PHONY	+= clean
-clean: ## cleans all the obj files
-	@$(RM) $(ODIR)*.o
+# wildcard-guarded: an -include of a *nonexistent* .d file makes GNU Make try to
+# build it as a target, which falls through to .DEFAULT and recurses via $(MAKE).
+-include $(wildcard $(DEPS))
 
-PHONY	+= fclean
-fclean: clean removeSANITIZED ## uses the rule clean and removes the obsolete files
-	@$(RM) $(NAME) $(ODIR) $(OBS)
+PHONY += clean
+clean: ## remove all object files
+	@$(RM) $(OBJ_ROOT)
 
-PHONY	+= re
-re: fclean all ## does fclean and all
+PHONY += fclean
+fclean: clean ## clean + remove binaries and generated junk
+	@$(RM) $(BINARIES) $(OBS)
 
-PHONY	+=  debugrun coverage clean
+PHONY += re
+re: fclean all ## fclean then rebuild
 
-# Optional arguments passed like: make debugrun ARGS="--port 8080 --verbose"
-ARGS ?=
+PHONY += build
+build: ## parallel release build using all cores
+	@echo "$(L_BLUE)  [info]:  $(L_GREEN)Starting parallel build using '$(NUMPROC)' threads...$(RESET)"
+	@$(MAKE) -s -j$(NUMPROC) all
 
-debugrun: ## Run the program with LLVM coverage instrumentation
-	@echo "Running with coverage instrumentation..."
-	LLVM_PROFILE_FILE="$(NAME).profraw" ./$(NAME) $(ARGS)
+# --------------------------------- Tests ------------------------------------- #
 
-coverage: ## Merge and generate coverage reports
-	@echo "Generating coverage reports..."
-	@llvm-profdata merge -sparse $(NAME).profraw -o $(NAME).profdata
-	@llvm-cov report ./$(NAME) -instr-profile=$(NAME).profdata
-	@llvm-cov show ./$(NAME) -instr-profile=$(NAME).profdata -format=html -output-dir=coverage
+PHONY += test
+test: $(NAME) ## build release and run the integration test suite
+	@bash tests/run_tests.sh ./$(NAME)
+
+PHONY += test-asan
+test-asan: $(NAME)-asan ## run the test suite against the sanitized binary
+	@ASAN_OPTIONS=detect_leaks=1 IRC_TIMEOUT=8 bash tests/run_tests.sh ./$(NAME)-asan
+
+PHONY += valgrind
+valgrind: $(NAME)-debug ## run the test suite under valgrind (leak check)
+	@IRC_WRAPPER="valgrind --leak-check=full --show-leak-kinds=definite --errors-for-leak-kinds=definite --error-exitcode=42" \
+		IRC_TIMEOUT=10 bash tests/run_tests.sh ./$(NAME)-debug
+
+# ------------------------------- Coverage ------------------------------------ #
+
+PHONY += coverage
+coverage: ## build instrumented binary, run test suite, report coverage (clang only)
+ifeq (,$(findstring clang,$(CXX)))
+	@echo >&2 "$(L_RED)[Error]$(RESET): coverage requires clang (current CXX: $(CXX)). Try 'make coverage CXX=clang++'."
+	@exit 1
+else
+	@$(MAKE) -s $(NAME)-cover
+	@mkdir -p $(OBJ_ROOT)/cover
+	@LLVM_PROFILE_FILE="$(OBJ_ROOT)/cover/%p.profraw" bash tests/run_tests.sh ./$(NAME)-cover
+	@llvm-profdata merge -sparse $(OBJ_ROOT)/cover/*.profraw -o $(NAME).profdata
+	@llvm-cov report ./$(NAME)-cover -instr-profile=$(NAME).profdata
+	@llvm-cov show ./$(NAME)-cover -instr-profile=$(NAME).profdata -format=html -output-dir=coverage
 	@echo "HTML report available in ./coverage/index.html"
+endif
 
+# ---------------------------- Static Analysis -------------------------------- #
 
 TIDY_FLAGS =	'clang-analyzer-*,\
 				bugprone-*,\
@@ -213,48 +206,53 @@ TIDY_FLAGS =	'clang-analyzer-*,\
 				misc-use-anonymous-namespace,\
 				misc-definitions-in-headers'
 
-TIDY_EXTRA_ARGS =	--extra-arg=-std=c++98 \
-					--extra-arg=-Iincludes \
-					--extra-arg=-Wno-c++98-compat
+CLANG_TIDY := $(firstword $(foreach v,$(shell seq 21 -1 15),$(if $(shell command -v clang-tidy-$(v)),clang-tidy-$(v))))
+ifeq ($(CLANG_TIDY),)
+CLANG_TIDY := clang-tidy
+endif
 
-CLANG_TIDY = clang-tidy-20
-
-PHONY	+= tidy
-tidy: MODE := tidy $(CLANG_TIDY)
-tidy: info ## run clang-tidy on project 
+PHONY += tidy
+tidy: ## run clang-tidy on the project (advisory)
 	@$(CLANG_TIDY) $(SRC) \
 	--checks=$(TIDY_FLAGS) \
-	$(TIDY_EXTRA_ARGS) \
-	--header-filter='includes/.*' \
+	--header-filter='$(INC)/.*' \
 	--system-headers=false \
 	--quiet \
-	-- $(CXXFLAGS) $(INCLUDES)
-	@echo "✅ check complete"
+	-- $(BASEFLAGS)
+	@echo "✅ tidy check complete"
 
-# DETECTED_SCAN_BUILD := $(firstword $(foreach v,$(shell seq 21 -1 15),$(if $(shell command -v scan-build-$(v) >/dev/null 2>&1 && echo scan-build-$(v)),scan-build-$(v))))
-# Try to find the newest scan-build from version 21 down to 15
-# If none are found in that range, default to scan-build-20 (original value)
-PHONY += scan
+PHONY += cppcheck
+cppcheck: ## run cppcheck static analysis (CI gate)
+	@cppcheck --std=c++03 --language=c++ \
+		--enable=warning,performance,portability \
+		--inline-suppr --error-exitcode=1 \
+		--suppress=missingIncludeSystem \
+		-I$(INC) $(SRCDIR)
+	@echo "✅ cppcheck complete"
+
+PHONY += check
+check: cppcheck tidy ## run all static analysis
 
 SCAN_BUILD := $(firstword $(foreach v,$(shell seq 21 -1 15),$(if $(shell command -v scan-build-$(v)),scan-build-$(v))))
 ifeq ($(SCAN_BUILD),)
-SCAN_BUILD := scan-build-20
+SCAN_BUILD := scan-build
 endif
 
-scan: MODE := scan $(SCAN_BUILD)
-scan: fclean ## Scan-build static analysis
-	@echo "🔍 Running scan-build..."
-	$(info Using scan-build: $(SCAN_BUILD))
-	@CC=$(CC) CXX=$(CXX) $(SCAN_BUILD) \
+PHONY += scan
+scan: fclean ## scan-build static analysis
+	@echo "🔍 Running scan-build ($(SCAN_BUILD))..."
+	@CXX=$(CXX) $(SCAN_BUILD) \
 		-enable-checker alpha \
 		-enable-checker security -enable-checker unix -enable-checker core \
 		-enable-checker cplusplus -enable-checker deadcode -enable-checker nullability \
 		-analyzer-config aggressive-binary-operation-simplification=true \
-		-v make
+		-v $(MAKE)
 	@echo "✅ Scan-build analysis complete"
 
-PHONY	+=	banner
-SHIFT	=	$(eval O=$(shell echo $$((($(O)%15)+1))))
+# ------------------------------- Cosmetics ------------------------------------ #
+
+PHONY += banner
+SHIFT = $(eval O=$(shell echo $$((($(O)%15)+1))))
 banner: ## prints the ircserv banner for the makefile
 	@echo " $(C)$(O)$(L)+----------------------------------------+$(RESET)"
 	@echo " $(C)$(O)$(L)|  _                                     |";
@@ -266,29 +264,29 @@ banner: ## prints the ircserv banner for the makefile
 	@echo " $(C)$(O)$(L)| |_||_|   \___||___/ \___||_|     \_/   |";
 	@echo " $(C)$(O)$(L)+----------------------------------------+$(RESET)"
 
-PHONY	+= info
+PHONY += info
 info: ## prints project based info
 	@echo "$(L_CYAN)# ------------------------- Build Info -------------------------- #$(RESET)"
 	@echo "$(L_GREEN)NAME        $(RESET): $(L_MAGENTA)$(NAME)$(RESET)"
 	@echo "$(L_GREEN)UNAME       $(RESET): $(L_MAGENTA)$(UNAME)$(RESET)"
 	@echo "$(L_GREEN)NUMPROC     $(RESET): $(L_MAGENTA)$(NUMPROC)$(RESET)"
-	@echo "$(L_GREEN)CC          $(RESET): $(L_MAGENTA)$(COMPILER_VERSION)$(RESET)"
-	@echo "$(L_GREEN)STANDARD    $(RESET): $(L_MAGENTA)$(STANDARD)$(RESET)"
-	@echo "$(L_GREEN)CXXFLAGS    $(RESET): $(L_MAGENTA)$(CXXFLAGS)$(RESET)"
+	@echo "$(L_GREEN)CXX         $(RESET): $(L_MAGENTA)$(COMPILER_VERSION)$(RESET)"
+	@echo "$(L_GREEN)STANDARD    $(RESET): $(L_MAGENTA)$(STDFLAG)$(RESET)"
+	@echo "$(L_GREEN)BASEFLAGS   $(RESET): $(L_MAGENTA)$(BASEFLAGS)$(RESET)"
+	@echo "$(L_GREEN)RELEASE     $(RESET): $(L_MAGENTA)$(RELEASE_FLAGS)$(RESET)"
+	@echo "$(L_GREEN)DEBUG       $(RESET): $(L_MAGENTA)$(DEBUG_FLAGS)$(RESET)"
+	@echo "$(L_GREEN)ASAN        $(RESET): $(L_MAGENTA)$(ASAN_FLAGS)$(RESET)"
 	@echo "$(L_GREEN)LDFLAGS     $(RESET): $(L_MAGENTA)$(LDFLAGS)$(RESET)"
-	@echo "$(L_GREEN)CFLAGS      $(RESET): $(L_MAGENTA)$(CFLAGS)$(RESET)"
-	@echo "$(L_GREEN)DEBUGFLAGS  $(RESET): $(L_MAGENTA)$(DEBUGFLAGS)$(RESET)"
-	@echo "$(L_GREEN)BUILD MODE  $(RESET): $(L_MAGENTA)$(MODE)$(RESET)"
 	@echo "$(L_GREEN)SRC         $(RESET):"
 	@echo "$(L_BLUE)$(SRC)$(RESET)"
 	@echo "$(L_CYAN)# --------------------------------------------------------------- #$(RESET)"
 
-PHONY	+= help
+PHONY += help
 help: ## prints a list of the possible commands
 	@echo "$(L_CYAN)# ------------------------- Help Menu -------------------------- #$(RESET)"
-	@printf "$(L_MAGENTA)%-15s$(RESET) $(L_BLUE)make [option] [target] ...$(RESET)\n\n" "Usage:"
+	@printf "$(L_MAGENTA)%-15s$(RESET) $(L_BLUE)make [target] ...$(RESET)\n\n" "Usage:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "$(L_GREEN)%-15s$(L_BLUE) %s$(RESET)\n", $$1, $$2}'
-	@printf "\n$(L_GREEN)NOTE:$(L_BLUE) Use 'make mode=debug' for debug mode build.$(RESET)\n"
+	@printf "\n$(L_GREEN)NOTE:$(L_BLUE) Use 'make debug' or 'make asan' for instrumented builds.$(RESET)\n"
 	@printf "\n%-35s ${L_BLUE}This MAKE has Super Cow Powers.${RESET}\n"
 	@echo "$(L_CYAN)# --------------------------------------------------------------- #$(RESET)"
 
@@ -298,8 +296,6 @@ help: ## prints a list of the possible commands
 
 # ----------------------------- Phony Targets -------------------------------- #
 
-# Declare the contents of the PHONY variable as phony.  We keep that
-# information in a variable so we can use it if changed.
 .PHONY: $(PHONY)
 
 # ---------------------------- Color Definitions ----------------------------- #

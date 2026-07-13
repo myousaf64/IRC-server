@@ -3,6 +3,9 @@
 .vscode
 Makefile.mk
 ircserv
+ircserv-debug
+ircserv-asan
+ircserv-cover
 
 fixed
 *fixed
