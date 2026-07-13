@@ -11,51 +11,73 @@ on:
 jobs:
     build-and-test:
         runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                compiler: [g++, clang++]
 
         steps:
             - name: Checkout code
-              uses: actions/checkout@v2
+              uses: actions/checkout@v4
 
             - name: Set up C++ environment
               run: |
                   sudo apt-get update
-                  sudo apt-get install -y g++ make cppcheck lcov doxygen
-
-            # - name: Install Dependencies
-            #   run: |
-            #       # Uncomment if using Conan for dependency management
-            #       # curl -s https://get.conan.io | python
-            #       # conan install . --build=missing
-            #       echo "Add any dependencies installation commands here."
-
-            # - name: Static Code Analysis
-            #   run: cppcheck --enable=all --inconclusive .
+                  sudo apt-get install -y make g++ clang
 
             - name: Build the project
-              run: make CXXFLAGS="-Wall -Wextra -Werror -std=c++98 -I./inc"
+              run: make CXX=${{ matrix.compiler }}
 
-            # - name: Run unit tests
-            #   run: ./path/to/your/test/executable # Replace with the path to your test executable
+            - name: Run integration test suite
+              run: make test CXX=${{ matrix.compiler }}
 
-            # - name: Generate Code Coverage
-            #   run: |
-            #       make clean
-            #       make CXXFLAGS="-Wall -Wextra -Werror -std=c++98 --coverage"
-            #       ./ircserv 223 password # ./path/to/executable
-            #       lcov --capture --directory . --output-file coverage.info --ignore-errors empty unused
-            #       lcov --remove coverage.info '/usr/*' --output-file coverage.info --ignore-errors empty unused
-            #       bash <(curl -s https://codecov.io/bash) -f coverage.info
-
-            # - name: Generate Documentation
-            #   run: doxygen Doxyfile # Ensure you have a Doxyfile configured
-
-            - name: Notify success
-              if: success()
-              run: echo "Build and tests succeeded!"
-
-            - name: Notify failure and Rollback Mechanism 
+            - name: Upload test artifacts on failure
               if: failure()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: test-logs-${{ matrix.compiler }}
+                  path: |
+                      **/server.log
+                  if-no-files-found: ignore
+
+    asan:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up clang
               run: |
-                  echo "Build or tests failed!"
-                  echo "Rolling back to the previous stable version..."
-                  # Insert rollback commands here, e.g., reverting to a previous commit or restoring a backup
+                  sudo apt-get update
+                  sudo apt-get install -y make clang
+
+            - name: Build with sanitizers
+              run: make asan CXX=clang++
+
+            - name: Run integration test suite under ASan/UBSan
+              run: make test-asan CXX=clang++
+
+            - name: Upload test artifacts on failure
+              if: failure()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: test-logs-asan
+                  path: |
+                      **/server.log
+                  if-no-files-found: ignore
+
+    cppcheck:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install cppcheck
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y cppcheck
+
+            - name: Run cppcheck
+              run: make cppcheck
