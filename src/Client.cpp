@@ -3,6 +3,8 @@
 Client::Client(int fd): fd(fd) {
     isOperator = false;
     state = UNAUTHENTICATED;
+    registered = false;
+    logedin = false;
 }
 
 Client::Client() {

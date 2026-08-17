@@ -97,14 +97,6 @@ void Server::handleNewConnection(int sFd, std::vector<pollfd>& fds) {
 	}
 
 	logError("New client connected, FD: {%i}", clientFd);
-	
-	const std::string welcome = ":ircserv 001 client :Welcome to ft_irc\r\n";
-	ssize_t bytesSent = send(clientFd, welcome.c_str(), welcome.length(), 0);
-	if (bytesSent == -1) {
-		throw std::runtime_error("Failed to send welcome message to client");
-	}
-	
-	logError("Welcome message sent to client FD: {%i}", clientFd);
 }
 
 void Server::handleClientMessage(size_t clientIndex, std::vector<pollfd>& fds) {
@@ -138,16 +130,26 @@ void Server::handleClientMessage(size_t clientIndex, std::vector<pollfd>& fds) {
             return ;
         }
 		client->setBuffer(buffer);
-		if (client->getBuffer().find_first_of("\r\n") == std::string::npos)
-			return ;
 
-		std::vector<std::string> cmd;
-		cmd = splitReceivedBuffer(client->getBuffer());
-		for (size_t i = 0; i < cmd.size(); i++) {
-			this->getCmd(cmd[i], clientFd);
+		// Only process complete (LF-terminated) lines; a TCP read can split an
+		// IRC command across multiple recv() calls, so any trailing fragment
+		// with no terminator yet must stay buffered for the next read.
+		const std::string data = client->getBuffer();
+		size_t start = 0;
+		size_t pos;
+		while ((pos = data.find('\n', start)) != std::string::npos) {
+			std::string line = data.substr(start, pos - start);
+			if (!line.empty() && line[line.size() - 1] == '\r')
+				line.erase(line.size() - 1);
+			start = pos + 1;
+			if (!GetClient(clientFd))
+				break;
+			this->getCmd(line, clientFd);
 		}
 		if (GetClient(clientFd)) {
 			GetClient(clientFd)->clearBuffer();
+			if (start < data.size())
+				GetClient(clientFd)->setBuffer(data.substr(start));
 		}
 	}
 }
@@ -308,9 +310,9 @@ void Server::_sendResponse(std::string response, int fd)
 		std::cerr << "Response send() faild \n";
 }
 
-bool    Server::notregistered(int fd) {
-    (void) fd;
-    return (false);
+bool    Server::isRegistered(int fd) {
+    Client *cli = GetClient(fd);
+    return (cli != NULL && cli->GetLogedIn());
 }
 
 void Server::getCmd(std::string& cmd, int fd)
@@ -343,7 +345,7 @@ void Server::getCmd(std::string& cmd, int fd)
 		set_username(cmd, fd);
 	else if (command == "quit")
 		QUIT(cmd, fd);
-	else if (notregistered(fd))
+	else if (isRegistered(fd))
 	{
 		if (command == "kick")
 			KICK(cmd, fd);

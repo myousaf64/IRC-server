@@ -2,11 +2,10 @@
 
 #include <string>
 #include <iostream>
-#include <string_view>
 
 #ifndef CRLF
-# define CRLF "\r\n";
-#endif 
+# define CRLF "\r\n"
+#endif
 // extern const std::string CRLF = "\r\n";
 
 inline std::string RPL_CONNECTED(const std::string& nickname) {
