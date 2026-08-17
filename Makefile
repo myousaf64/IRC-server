@@ -78,10 +78,25 @@ RM  := rm -fr
 OBS := $(NAME).dSYM .DS_Store output.log $(NAME).profdata $(NAME).profraw coverage \
 	   coverage.txt coverage.info out
 
+# Keep the historic `make MODE=debug` command working without sharing build
+# artifacts between release and instrumented variants.
+MODE ?= release
+ifneq ($(MODE),release)
+ifneq ($(MODE),debug)
+$(error Unsupported MODE '$(MODE)'; use MODE=release or MODE=debug)
+endif
+endif
+
+ifeq ($(MODE),debug)
+DEFAULT_TARGET := debug
+else
+DEFAULT_TARGET := $(NAME) banner
+endif
+
 # --------------------------- Targets & Rules --------------------------------- #
 
 PHONY += all
-all: $(NAME) banner ## build the release binary (default)
+all: $(DEFAULT_TARGET) ## build the selected release or debug variant
 
 $(NAME): $(OBJ_RELEASE)
 	@$(CXX) $(BASEFLAGS) $(RELEASE_FLAGS) $(LDFLAGS) $^ -o $@
@@ -285,8 +300,8 @@ PHONY += help
 help: ## prints a list of the possible commands
 	@echo "$(L_CYAN)# ------------------------- Help Menu -------------------------- #$(RESET)"
 	@printf "$(L_MAGENTA)%-15s$(RESET) $(L_BLUE)make [target] ...$(RESET)\n\n" "Usage:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "$(L_GREEN)%-15s$(L_BLUE) %s$(RESET)\n", $$1, $$2}'
-	@printf "\n$(L_GREEN)NOTE:$(L_BLUE) Use 'make debug' or 'make asan' for instrumented builds.$(RESET)\n"
+	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "$(L_GREEN)%-15s$(L_BLUE) %s$(RESET)\n", $$1, $$2}'
+	@printf "\n$(L_GREEN)NOTE:$(L_BLUE) Use 'make debug', 'make MODE=debug', or 'make asan' for instrumented builds.$(RESET)\n"
 	@printf "\n%-35s ${L_BLUE}This MAKE has Super Cow Powers.${RESET}\n"
 	@echo "$(L_CYAN)# --------------------------------------------------------------- #$(RESET)"
 
