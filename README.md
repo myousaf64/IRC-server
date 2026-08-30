@@ -35,3 +35,8 @@ make check       # cppcheck and clang-tidy
 
 - The solo version lives in [dal-chawal](https://github.com/myousaf64/dal-chawal).
 - This repository has open issues; see the issue tracker for current work.
+
+## TODO
+
+- [ ] Resolve or remove the TODO and FIXME markers in 1 file:
+      `src/CommandHandler.cpp`
