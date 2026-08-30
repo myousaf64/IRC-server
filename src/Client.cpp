@@ -16,9 +16,12 @@ Client::Client() {
 	this->buffer = "";
 	this->ipadd = "";
 	this->logedin = false;
+	this->state = UNAUTHENTICATED;
 }
 
-Client::Client(std::string nickname, std::string username, int fd) :fd(fd), nickname(nickname), username(username) { }
+Client::Client(const std::string &nickname, const std::string &username, int fd)
+	:fd(fd), nickname(nickname), username(username), state(UNAUTHENTICATED),
+	isOperator(false), registered(false), logedin(false) { }
 Client::~Client( ) { }
 Client::Client( Client const &src ) { *this = src; }
 
@@ -32,6 +35,7 @@ Client &Client::operator=(Client const &src){
 		this->registered = src.registered;
 		this->ipadd = src.ipadd;
 		this->logedin = src.logedin;
+		this->state = src.state;
 	}
 	return *this;
 }
@@ -59,9 +63,9 @@ void Client::SetFd( int fd ) { this->fd = fd; }
 void Client::SetNickname( std::string& nickName ) { this->nickname = nickName; }
 void Client::setLogedin(bool value){this->logedin = value; }
 void Client::SetUsername(std::string& username){this->username = username; }
-void Client::setBuffer(std::string recived){buffer += recived; }
+void Client::setBuffer(const std::string &recived){buffer += recived; }
 void Client::setRegistered(bool value){registered = value; }
-void Client::setIpAdd(std::string ipadd){this->ipadd = ipadd; }
+void Client::setIpAdd(const std::string &ipadd){this->ipadd = ipadd; }
 
 void Client::clearBuffer() { buffer.clear(); }
 void Client::AddChannelInvite( std::string &chname ) {

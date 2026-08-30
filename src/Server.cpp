@@ -5,7 +5,7 @@
 #include "Response.hpp"
 
 Server::Server(const int port, const std::string& password) 
-	: _port(port), _password(password) {}
+	: _port(port), _password(password), sfds(-1) {}
 
 bool Server::isValid() const {
 	return (_port >= MIN_PORT && _port <= MAX_PORT) && !_password.empty();
@@ -197,7 +197,7 @@ void Server::run(int sFd) {
 	}
 }
 
-Server::Server( ) { this->sfds = -1; }
+Server::Server( ) : _port(0), sfds(-1) { }
 Server::~Server( ) { }
 Server::Server( Server const &src ) { *this = src; }
 Server &Server::operator=( Server const &src ) {
@@ -223,7 +223,7 @@ Client *Server::GetClient(int fd){
 	return NULL;
 }
 
-Client *Server::GetClientNick(std::string nickname){
+Client *Server::GetClientNick(const std::string &nickname){
 	for (size_t i = 0; i < this->clients.size(); i++){
 		if (this->clients[i].GetNickName() == nickname)
 			return &this->clients[i];
@@ -231,7 +231,7 @@ Client *Server::GetClientNick(std::string nickname){
 	return NULL;
 }
 
-Channel *Server::GetChannel(std::string name)
+Channel *Server::GetChannel(const std::string &name)
 {
 	for (size_t i = 0; i < this->channels.size(); i++){
 		if (this->channels[i].GetName() == name)
@@ -243,7 +243,7 @@ Channel *Server::GetChannel(std::string name)
 /** setters */
 void Server::SetFd( int fd ) { this->sfds = fd; }
 void Server::SetPort( int port ) { this->_port = port; }
-void Server::SetPassword( const std::string password ) { this->_password = password; }
+void Server::SetPassword( const std::string &password ) { this->_password = password; }
 
 std::string Server::GetPassword(  ) { return this->_password; }
 
@@ -257,7 +257,7 @@ void Server::RemoveClient(int fd){
 			{this->clients.erase(this->clients.begin() + i); return;}
 	}
 }
-void Server::RemoveChannel(std::string name){
+void Server::RemoveChannel(const std::string &name){
 	for (size_t i = 0; i < this->channels.size(); i++){
 		if (this->channels[i].GetName() == name)
 			{this->channels.erase(this->channels.begin() + i); return;}
@@ -286,7 +286,7 @@ void	Server::RmChannels(int fd){
 	}
 }
 
-void Server::senderror(int code, std::string clientname, int fd, std::string msg)
+void Server::senderror(int code, const std::string &clientname, int fd, const std::string &msg)
 {
 	std::stringstream ss;
 	ss << ":localhost " << code << " " << clientname << msg;
@@ -295,7 +295,7 @@ void Server::senderror(int code, std::string clientname, int fd, std::string msg
 		std::cerr << "send() faild \n";
 }
 
-void Server::senderror(int code, std::string clientname, std::string channelname, int fd, std::string msg)
+void Server::senderror(int code, const std::string &clientname, const std::string &channelname, int fd, const std::string &msg)
 {
 	std::stringstream ss;
 	ss << ":localhost " << code << " " << clientname << " " << channelname << msg;
@@ -304,7 +304,7 @@ void Server::senderror(int code, std::string clientname, std::string channelname
 		std::cerr << "send() faild \n";
 }
 
-void Server::_sendResponse(std::string response, int fd)
+void Server::_sendResponse(const std::string &response, int fd)
 {
 	if(send(fd, response.c_str(), response.size(), 0) == -1)
 		std::cerr << "Response send() faild \n";

@@ -16,7 +16,7 @@ class Client {
 	public:
 		Client();
 		Client( int fd );
-		Client(std::string nickname, std::string username, int fd);
+		Client(const std::string &nickname, const std::string &username, int fd);
 		~Client();
 
 		Client(Client const &src);
@@ -43,9 +43,9 @@ class Client {
 		void	SetNickname(std::string& nickName);
 		void	setLogedin(bool value);
 		void	SetUsername(std::string& username);
-		void	setBuffer(std::string recived);
+		void	setBuffer(const std::string &recived);
 		void	setRegistered(bool value);
-		void	setIpAdd(std::string ipadd);
+		void	setIpAdd(const std::string &ipadd);
 
 
 	private:
