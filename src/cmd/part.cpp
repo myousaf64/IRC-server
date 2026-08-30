@@ -73,7 +73,7 @@ int Server::SplitCmdPart(const std::string& cmd, std::vector<std::string> &tmp, 
     } else {
         for (size_t i = 0; i < reason.size(); i++) {
             if (reason[i] == ' ') {
-                reason = reason.substr(0, i);
+                reason.resize(i);
                 break;
             }
         }

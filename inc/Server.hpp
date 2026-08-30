@@ -86,13 +86,13 @@ public:
 	int	GetFd( );
 	const int&	getPort( ) const { return _port; }
 	Client	*GetClient( int fd );
-	Client	*GetClientNick( std::string nickname );
-	Channel	*GetChannel( std::string name );
+	Client	*GetClientNick( const std::string &nickname );
+	Channel	*GetChannel( const std::string &name );
 	std::string	GetPassword( );
 
 	void	SetFd( int sfds );
 	void	SetPort( int port );
-	void	SetPassword( std::string password );
+	void	SetPassword( const std::string &password );
 	void	AddClient( Client newClient );
 	void	AddChannel( Channel newChannel );
 	void	AddFds( pollfd newFd );
@@ -100,13 +100,13 @@ public:
 	void	set_nickname( std::string cmd, int fd );
 
 	void	RemoveClient( int fd );
-	void	RemoveChannel( std::string name );
+	void	RemoveChannel( const std::string &name );
 	void	RemoveFds( int fd );
 	void	RmChannels( int fd );
 
-	void	senderror( int code, std::string clientname, int fd, std::string msg );
-	void	senderror( int code, std::string clientname, std::string channelname, int fd, std::string msg );
-	void	_sendResponse( std::string response, int fd );
+	void	senderror( int code, const std::string &clientname, int fd, const std::string &msg );
+	void	senderror( int code, const std::string &clientname, const std::string &channelname, int fd, const std::string &msg );
+	void	_sendResponse( const std::string &response, int fd );
 
 	// void	init( int port, std::string pass );
 	// void	accept_new_client( );

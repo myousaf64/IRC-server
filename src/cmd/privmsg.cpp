@@ -75,7 +75,7 @@ std::string SplitCmdPrivmsg(const std::string& cmd, std::vector<std::string>& tm
     else {
         for (size_t i = 0; i < str.size(); i++) {
             if (str[i] == ' ') {
-                str = str.substr(0, i);
+                str.resize(i);
                 break;
             }
         }

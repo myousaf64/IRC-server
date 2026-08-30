@@ -39,12 +39,12 @@ Channel &Channel::operator=( Channel const &src ) {
 
 void Channel::SetInvitOnly(int inviteOnly){this->inviteOnly = inviteOnly;}
 void Channel::SetTopic(int topic){this->topic = topic;}
-void Channel::SetTime(std::string time){this->time_creation = time;}
+void Channel::SetTime(const std::string &time){this->time_creation = time;}
 void Channel::SetKey(int keyEnabled){this->keyEnabled = keyEnabled;}
 void Channel::SetLimit(int limit){this->limit = limit;}
-void Channel::SetTopicName(std::string topic_name){this->topic_name = topic_name;}
-void Channel::SetPassword(std::string password){this->password = password;}
-void Channel::SetName(std::string name){this->name = name;}
+void Channel::SetTopicName(const std::string &topic_name){this->topic_name = topic_name;}
+void Channel::SetPassword(const std::string &password){this->password = password;}
+void Channel::SetName(const std::string &name){this->name = name;}
 void Channel::set_topicRestriction(bool value){this->topicRestricted = value;}
 void Channel::setModeAtindex(size_t index, bool mode){modes[index].second = mode;}
 void Channel::set_createiontime() {
@@ -124,7 +124,7 @@ Client *Channel::get_admin(int fd){
 	return NULL;
 }
 
-Client* Channel::GetClientInChannel(std::string name)
+Client* Channel::GetClientInChannel(const std::string &name)
 {
 	for (std::vector<Client>::iterator it = clients.begin(); it != clients.end(); ++it){
 		if (it->GetNickName() == name)
@@ -184,7 +184,7 @@ bool Channel::change_adminToClient(std::string& nick){
 
 }
 
-void Channel::sendTo_all(std::string rpl1)
+void Channel::sendTo_all(const std::string &rpl1)
 {
 	for (size_t i = 0; i < admins.size(); i++) {
 		if (send(admins[i].GetFd(), rpl1.c_str(), rpl1.size(),0) == -1) {
@@ -197,7 +197,7 @@ void Channel::sendTo_all(std::string rpl1)
 		}
 	}
 }
-void Channel::sendTo_all(std::string rpl1, int fd)
+void Channel::sendTo_all(const std::string &rpl1, int fd)
 {
 	for (size_t i = 0; i < admins.size(); i++) {
 		if (admins[i].GetFd() != fd)
